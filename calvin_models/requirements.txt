@@ -12,12 +12,11 @@ pytorch-lightning
 lightning_lite
 torch
 torchvision
-MulticoreTSNE
 gitpython
 scipy
 sentence-transformers
 setuptools
-gym
+gymnasium
 moviepy
 tqdm
 termcolor
