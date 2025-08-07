@@ -51,7 +51,7 @@ def rollout(
     for mod in modalities:
         groundtruth_task = id_to_task_dict[int(idx)]
         # reset env to state of first step in the episode
-        obs = env.reset(robot_obs=reset_info["robot_obs"][0], scene_obs=reset_info["scene_obs"][0])
+        obs, _ = env.reset(robot_obs=reset_info["robot_obs"][0], scene_obs=reset_info["scene_obs"][0])
         start_info = env.get_info()
         demo_task_counter += Counter(groundtruth_task)
         current_img_obs = obs["rgb_obs"]
@@ -87,7 +87,7 @@ def rollout(
 
             # use plan to predict actions with current observations
             action = model.predict_with_plan(current_img_obs, current_state_obs, latent_goal, plan)
-            obs, _, _, current_info = env.step(action)
+            obs, _, _, _, current_info = env.step(action)
             # check if current step solves a task
             current_task_info = tasks.get_task_info_for_set(start_info, current_info, groundtruth_task)
             # check if a task was achieved and if that task is a subset of the original tasks
@@ -169,7 +169,10 @@ def test_policy(input_cfg: DictConfig) -> None:
     env = hydra.utils.instantiate(cfg.callbacks.rollout.env_cfg, dataset, torch.device("cuda:0"), show_gui=False)
 
     try:
-        embeddings = np.load(dataset.abs_datasets_dir / "embeddings.npy", allow_pickle=True,).reshape(
+        embeddings = np.load(
+            dataset.abs_datasets_dir / "embeddings.npy",
+            allow_pickle=True,
+        ).reshape(
             -1
         )[0]
     except FileNotFoundError:

@@ -40,7 +40,7 @@ def rollout(model, episode, env, tasks, demo_task_counter, live_task_counter, cf
         env.reset(reset_info, i, -1)
         goal_info = env.get_info()
         # reset env to state of first step in the episode
-        obs = env.reset(reset_info, i, 0)
+        obs, _ = env.reset(reset_info, i, 0)
         # noise = torch.ones(obs['state_obs'].shape) * eps
         obs["state_obs"] = obs["state_obs"]  # + noise
         start_info = env.get_info()
@@ -51,7 +51,7 @@ def rollout(model, episode, env, tasks, demo_task_counter, live_task_counter, cf
             continue
         neutral_init = input("Start rollout from Neutral Position ? [y/n] \n")
         if "y" in neutral_init:
-            obs = env.reset()
+            obs, _ = env.reset()
         demo_task_counter += Counter(task_info)
         current_img_obs = obs["rgb_obs"]
         current_state_obs = obs["state_obs"]
@@ -77,7 +77,7 @@ def rollout(model, episode, env, tasks, demo_task_counter, live_task_counter, cf
 
             # use plan to predict actions with current observations
             action = model.predict_with_plan(current_img_obs, current_state_obs, latent_goal, plan)
-            obs, _, _, current_info = env.step(action)
+            obs, _, _, _, current_info = env.step(action)
             # check if current step solves a task
             current_task_info = tasks.get_task_info(start_info, current_info)
             # check if a task was achieved and if that task is a subset of the original tasks

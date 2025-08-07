@@ -159,7 +159,7 @@ def rollout(env, model, task_oracle, subtask, val_annotations, plans, debug):
 
     for step in range(EP_LEN):
         action = model.step(obs, lang_annotation)
-        obs, _, _, current_info = env.step(action)
+        obs, _, _, _, current_info = env.step(action)
         if debug:
             img = env.render(mode="rgb_array")
             join_vis_lang(img, lang_annotation)

@@ -113,7 +113,7 @@ class RolloutLongHorizon(Callback):
         """Called when the validation loop begins."""
         if self.env is None:
             self.device = pl_module.device
-            dataset = trainer.val_dataloaders[0].dataset.datasets["lang"]  # type: ignore
+            dataset = trainer.val_dataloaders["lang"].dataset  # type: ignore
             from calvin_agent.rollout.rollout import Rollout
 
             for callback in trainer.callbacks:
@@ -207,7 +207,7 @@ class RolloutLongHorizon(Callback):
         success = False
         for step in range(self.ep_len):
             action = model.step(obs, lang_annotation)
-            obs, _, _, current_info = self.env.step(action)
+            obs, _, _, _, current_info = self.env.step(action)
             if self.debug and os.environ.get("DISPLAY") is not None:
                 img = self.env.render(mode="rgb_array")
                 join_vis_lang(img, lang_annotation)

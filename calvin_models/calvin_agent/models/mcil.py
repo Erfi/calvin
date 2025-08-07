@@ -139,9 +139,7 @@ class MCIL(pl.LightningModule, CalvinBaseModel):
 
         return kl_loss, action_loss, total_loss, pp_dist, pr_dist
 
-    def lmp_val(
-        self, perceptual_emb: torch.Tensor, latent_goal: torch.Tensor, actions: torch.Tensor
-    ) -> Tuple[
+    def lmp_val(self, perceptual_emb: torch.Tensor, latent_goal: torch.Tensor, actions: torch.Tensor) -> Tuple[
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
@@ -368,7 +366,7 @@ class MCIL(pl.LightningModule, CalvinBaseModel):
 
         return output
 
-    def validation_epoch_end(self, validation_step_outputs):
+    def on_validation_epoch_end(self, validation_step_outputs):
         val_total_act_loss_pr = torch.tensor(0.0).to(self.device)
         val_total_act_loss_pp = torch.tensor(0.0).to(self.device)
         val_kl_loss = torch.tensor(0.0).to(self.device)

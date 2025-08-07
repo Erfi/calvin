@@ -35,7 +35,7 @@ def rollout(env, model, episode, task_oracle, args, task, val_annotations):
     # state_obs, rgb_obs, depth_obs = episode["robot_obs"], episode["rgb_obs"], episode["depth_obs"]
     reset_info = episode["state_info"]
     # idx = episode["idx"]
-    obs = env.reset(robot_obs=reset_info["robot_obs"][0], scene_obs=reset_info["scene_obs"][0])
+    obs, _ = env.reset(robot_obs=reset_info["robot_obs"][0], scene_obs=reset_info["scene_obs"][0])
     # get lang annotation for subtask
     lang_annotation = val_annotations[task][0]
 
@@ -44,7 +44,7 @@ def rollout(env, model, episode, task_oracle, args, task, val_annotations):
 
     for step in range(args.ep_len):
         action = model.step(obs, lang_annotation)
-        obs, _, _, current_info = env.step(action)
+        obs, _, _, _, current_info = env.step(action)
         if args.debug:
             img = env.render(mode="rgb_array")
             join_vis_lang(img, lang_annotation)

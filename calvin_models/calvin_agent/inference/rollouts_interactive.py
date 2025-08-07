@@ -161,7 +161,7 @@ def rollout(model, env, tasks, cfg, start_info, current_img_obs, current_state_o
 
         # use plan to predict actions with current observations
         action = model.predict_with_plan(current_img_obs, current_state_obs, latent_goal, plan)
-        obs, _, _, current_info = env.step(action)
+        obs, _, _, _, current_info = env.step(action)
         # check if current step solves a task
         current_task_info = tasks.get_task_info(start_info, current_info)
         if len(current_task_info) > 0:

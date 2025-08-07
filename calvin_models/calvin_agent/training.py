@@ -22,7 +22,7 @@ from pytorch_lightning.utilities import rank_zero_only
 logger = logging.getLogger(__name__)
 
 
-@hydra.main(config_path="../conf", config_name="config")
+@hydra.main(config_path="../conf", config_name="config", version_base=None)
 def train(cfg: DictConfig) -> None:
     """
     This is called to start a training.

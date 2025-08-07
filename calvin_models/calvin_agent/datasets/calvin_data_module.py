@@ -10,7 +10,7 @@ import hydra
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import pytorch_lightning as pl
-from pytorch_lightning.trainer.supporters import CombinedLoader
+from pytorch_lightning.utilities import CombinedLoader
 from torch.utils.data import DataLoader
 import torchvision
 
@@ -50,10 +50,12 @@ class CalvinDataModule(pl.LightningDataModule):
 
         # download and unpack images
         if not dataset_exist:
-            logger.error(f"""No dataset found in {Path(self.training_dir).parent}.
+            logger.error(
+                f"""No dataset found in {Path(self.training_dir).parent}.
                 Please make sure you set the correct dataset path.
                 For information how to download one of the CALVIN datasets, please visit
-                https://github.com/mees/calvin/tree/main/dataset""")
+                https://github.com/mees/calvin/tree/main/dataset"""
+            )
             exit()
 
         if self.use_shm:

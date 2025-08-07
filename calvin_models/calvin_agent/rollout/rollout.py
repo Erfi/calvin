@@ -112,7 +112,7 @@ class Rollout(Callback):
         if self.env is None:
             self.modalities = trainer.datamodule.modalities  # type: ignore
             self.device = pl_module.device
-            dataset = trainer.val_dataloaders[0].dataset.datasets["vis"]  # type: ignore
+            dataset = trainer.val_dataloaders["vis"].dataset  # type: ignore
             from calvin_agent.rollout.rollout_long_horizon import RolloutLongHorizon
 
             for callback in trainer.callbacks:
@@ -138,7 +138,7 @@ class Rollout(Callback):
         outputs: Any,
         batch: Any,
         batch_idx: int,
-        dataloader_idx: int,
+        dataloader_idx: int = 0,
     ) -> None:
         batch = batch["vis"]
         if pl_module.current_epoch >= self.skip_epochs and (pl_module.current_epoch + 1) % self.rollout_freq == 0:
@@ -297,7 +297,7 @@ class Rollout(Callback):
                     # there can be more than one task solved in one sequence
                     groundtruth_task = self.id_to_task_dict[int(global_idx)]
                     # reset env to state of first step in the episode
-                    obs = self.env.reset(reset_info, i, 0)
+                    obs, _ = self.env.reset(reset_info, i, 0)
                     start_info = self.env.get_info()
 
                     if mod == "lang":
@@ -322,7 +322,7 @@ class Rollout(Callback):
                     success = False
                     for step in range(self.ep_len):
                         action = pl_module.step(obs, goal)  # type: ignore
-                        obs, _, _, current_info = self.env.step(action)
+                        obs, _, _, _, current_info = self.env.step(action)
                         if record_video:
                             # update video
                             self.rollout_video.update(obs["rgb_obs"]["rgb_static"])

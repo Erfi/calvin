@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, Tuple, Union
 
 from calvin_agent.datasets.utils.episode_utils import process_depth, process_rgb, process_state
-import gym
+import gymnasium as gym
 import numpy as np
 import torch
 
@@ -77,10 +77,10 @@ class CalvinEnvWrapper(gym.Wrapper):
                 raise NotImplementedError
             action = np.split(action_tensor.squeeze().cpu().detach().numpy(), slice_ids)
         action[-1] = 1 if action[-1] > 0 else -1
-        o, r, d, i = self.env.step(action)
+        o, r, term, trunc, i = self.env.step(action)
 
         obs = self.transform_observation(o)
-        return obs, r, d, i
+        return obs, r, term, trunc, i
 
     def reset(
         self,
@@ -89,18 +89,34 @@ class CalvinEnvWrapper(gym.Wrapper):
         seq_idx: int = 0,
         scene_obs: Any = None,
         robot_obs: Any = None,
-    ) -> Dict[str, Union[torch.Tensor, Dict[str, torch.Tensor]]]:
+        seed=None,
+        options=None,
+    ) -> Tuple[Dict[str, Union[torch.Tensor, Dict[str, torch.Tensor]]], Dict[str, Any]]:
+        # Handle gymnasium-style options parameter
+        if options is None:
+            options = {}
+
+        # Handle legacy parameters for backward compatibility
         if reset_info is not None:
-            obs = self.env.reset(
-                robot_obs=reset_info["robot_obs"][batch_idx, seq_idx],
-                scene_obs=reset_info["scene_obs"][batch_idx, seq_idx],
+            options.update(
+                {
+                    "robot_obs": reset_info["robot_obs"][batch_idx, seq_idx],
+                    "scene_obs": reset_info["scene_obs"][batch_idx, seq_idx],
+                }
             )
         elif scene_obs is not None or robot_obs is not None:
-            obs = self.env.reset(scene_obs=scene_obs, robot_obs=robot_obs)
-        else:
-            obs = self.env.reset()
+            if scene_obs is not None:
+                options["scene_obs"] = scene_obs
+            if robot_obs is not None:
+                options["robot_obs"] = robot_obs
 
-        return self.transform_observation(obs)
+        # Call the underlying environment's reset method
+        if options:
+            obs, info = self.env.reset(options=options, seed=seed)
+        else:
+            obs, info = self.env.reset(seed=seed)
+
+        return self.transform_observation(obs), info
 
     def get_info(self):
         return self.env.get_info()
