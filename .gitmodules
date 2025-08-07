@@ -1,3 +1,4 @@
 [submodule "calvin_env"]
 	path = calvin_env
-	url = https://github.com/mees/calvin_env.git
+	url = git@github.com:Erfi/calvin_env.git
+	branch = gymnasium
