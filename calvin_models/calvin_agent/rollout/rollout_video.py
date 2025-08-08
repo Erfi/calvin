@@ -127,7 +127,7 @@ class RolloutVideo:
         if isinstance(self.logger, WandbLogger) and not self.log_to_file:
             for video, tag in zip(self.videos, self.tags):
                 video = np.clip(video.numpy() * 255, 0, 255).astype(np.uint8)
-                wandb_vid = wandb.Video(video, fps=10, format="gif")
+                wandb_vid = wandb.Video(video, format="gif")
                 self.video_paths[tag] = wandb_vid._path
             self.videos = []
             self.tags = []
@@ -209,7 +209,7 @@ class RolloutVideo:
             video_paths = self.video_paths
             captions = self.captions
         for (task, path), caption in zip(video_paths.items(), captions):
-            self.logger.experiment.log({f"video{task}": wandb.Video(path, fps=10, format="gif", caption=caption)})
+            self.logger.experiment.log({f"video{task}": wandb.Video(path, format="gif", caption=caption)})
             delete_tmp_video(path)
 
     def _log_videos_to_file(self, global_step):
