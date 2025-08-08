@@ -47,7 +47,7 @@ def get_epoch(checkpoint):
 
 def make_env(dataset_path):
     val_folder = Path(dataset_path) / "validation"
-    env = get_env(val_folder, show_gui=False)
+    env = get_env(val_folder, show_gui=False, render_mode="rgb_array")
 
     # insert your own env wrapper
     # env = Wrapper(env)
@@ -161,7 +161,7 @@ def rollout(env, model, task_oracle, subtask, val_annotations, plans, debug):
         action = model.step(obs, lang_annotation)
         obs, _, _, _, current_info = env.step(action)
         if debug:
-            img = env.render(mode="rgb_array")
+            img = env.render()
             join_vis_lang(img, lang_annotation)
             # time.sleep(0.1)
         if step == 0:

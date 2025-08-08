@@ -46,7 +46,7 @@ def rollout(env, model, episode, task_oracle, args, task, val_annotations):
         action = model.step(obs, lang_annotation)
         obs, _, _, _, current_info = env.step(action)
         if args.debug:
-            img = env.render(mode="rgb_array")
+            img = env.render()
             join_vis_lang(img, lang_annotation)
             # time.sleep(0.1)
         # check if current step solves a task

@@ -5,6 +5,7 @@ _target_: calvin_agent.rollout.rollout.Rollout
 _recursive_: false
 env_cfg:
   _target_: calvin_agent.wrappers.calvin_env_wrapper.CalvinEnvWrapper
+  render_mode: rgb_array
 skip_epochs: 1
 rollout_freq: 1
 video: true

@@ -209,7 +209,7 @@ class RolloutLongHorizon(Callback):
             action = model.step(obs, lang_annotation)
             obs, _, _, _, current_info = self.env.step(action)
             if self.debug and os.environ.get("DISPLAY") is not None:
-                img = self.env.render(mode="rgb_array")
+                img = self.env.render()
                 join_vis_lang(img, lang_annotation)
             if record:
                 # update video

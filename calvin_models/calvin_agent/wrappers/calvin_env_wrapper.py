@@ -14,10 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class CalvinEnvWrapper(gym.Wrapper):
-    def __init__(self, dataset_loader, device, show_gui=False, **kwargs):
+    def __init__(self, dataset_loader, device, show_gui=False, render_mode=None, **kwargs):
         self.set_egl_device(device)
         env = get_env(
-            dataset_loader.abs_datasets_dir, show_gui=show_gui, obs_space=dataset_loader.observation_space, **kwargs
+            dataset_loader.abs_datasets_dir,
+            show_gui=show_gui,
+            render_mode=render_mode,
+            obs_space=dataset_loader.observation_space,
+            **kwargs,
         )
         super(CalvinEnvWrapper, self).__init__(env)
         self.observation_space_keys = dataset_loader.observation_space
