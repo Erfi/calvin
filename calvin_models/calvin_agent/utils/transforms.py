@@ -19,6 +19,10 @@ class NormalizeVector(object):
     """Normalize a tensor vector with mean and standard deviation."""
 
     def __init__(self, mean=0.0, std=1.0):
+        if isinstance(mean, float):
+            mean = [mean]
+        if isinstance(std, float):
+            std = [std]
         self.std = torch.Tensor(std)
         self.std[self.std == 0.0] = 1.0
         self.mean = torch.Tensor(mean)
