@@ -112,7 +112,12 @@ class Rollout(Callback):
         if self.env is None:
             self.modalities = trainer.datamodule.modalities  # type: ignore
             self.device = pl_module.device
-            dataset = trainer.val_dataloaders["vis"].dataset  # type: ignore
+            if "vis" in trainer.val_dataloaders:
+                dataset = trainer.val_dataloaders["vis"].dataset  # type: ignore
+            elif "lang" in trainer.val_dataloaders:
+                dataset = trainer.val_dataloaders["lang"].dataset
+            else:
+                raise ValueError("No validation dataloader found with 'vis' or 'lang' key.")
             from calvin_agent.rollout.rollout_long_horizon import RolloutLongHorizon
 
             for callback in trainer.callbacks:
