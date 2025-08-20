@@ -123,7 +123,6 @@ class RolloutLongHorizonVisualGoal(Callback):
         save_dir,
         empty_cache,
         debug,
-        data_dir,
         start_end_tasks_file,
         num_tasks_per_rollout,
     ):
@@ -138,7 +137,6 @@ class RolloutLongHorizonVisualGoal(Callback):
         self.save_dir = save_dir
         self.empty_cache = empty_cache
         self.debug = debug
-        self.data_dir = data_dir
         self.num_tasks_per_rollout = num_tasks_per_rollout
         self.start_end_tasks_file = start_end_tasks_file
         self.env = None
