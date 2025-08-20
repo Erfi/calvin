@@ -28,7 +28,7 @@ class CalvinEnvWrapper(gym.Wrapper):
         self.transforms = dataset_loader.transforms
         self.proprio_state = dataset_loader.proprio_state
         self.device = device
-        self.relative_actions = "rel_actions" in self.observation_space_keys["actions"]
+        self.relative_actions = self.observation_space_keys["actions"][0].startswith("rel_actions")
         logger.info(f"Initialized PlayTableEnv for device {self.device}")
 
     @staticmethod
