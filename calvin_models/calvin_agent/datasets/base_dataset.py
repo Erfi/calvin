@@ -75,7 +75,9 @@ class BaseDataset(Dataset):
         self.proprio_state = proprio_state
         self.transforms = transforms
         self.with_lang = key == "lang"
-        self.relative_actions = "rel_actions" in self.observation_space["actions"]
+        self.relative_actions = any(
+            [action_type.startswith("rel_actions") for action_type in self.observation_space["actions"]]
+        )
 
         self.pad = pad
         self.batch_size = batch_size
