@@ -97,11 +97,13 @@ class SharedMemoryLoader:
         self.obs_space = datasets_cfg.vision_dataset.obs_space
         self.dataset_dir = dataset_dir
         self.dataset_type = "train" if "training" in dataset_dir.as_posix() else "val"
-        self.lang_folder = datasets_cfg.lang_dataset.lang_folder
         self.naming_pattern, self.n_digits = lookup_naming_pattern(self.dataset_dir, "npz")
         self.min_window_size_vision = datasets_cfg.vision_dataset.min_window_size
-        self.min_window_size_lang = datasets_cfg.lang_dataset.min_window_size
         self.n_proc = 8
+        # Language dataset parameters
+        self.with_lang = "lang_dataset" in datasets_cfg.keys()
+        self.lang_folder = datasets_cfg.lang_dataset.lang_folder if self.with_lang else None
+        self.min_window_size_lang = datasets_cfg.lang_dataset.min_window_size if self.with_lang else None
 
     def _worker_process(self, proc_num, ep_start_end_ids, offsets, shmem, lang_ep_start_end_ids, return_dict):
         """
@@ -129,7 +131,7 @@ class SharedMemoryLoader:
 
                 for j, idx in enumerate(range(start_idx, end_idx + 1 - self.min_window_size_vision)):
                     episode_lookup_vision[key].append((offsets[key], j))
-                    if idx in lang_ep_start_end_ids[:, 0]:
+                    if self.with_lang and idx in lang_ep_start_end_ids[:, 0]:
                         lang_episode_dict[key][idx] = (offsets[key], j)
                 offsets[key] += array.nbytes
         return_dict[proc_num] = episode_lookup_vision, lang_episode_dict
@@ -143,27 +145,25 @@ class SharedMemoryLoader:
         Returns:
             Shared memory lookup dict.
         """
-        lang_data = np.load(self.dataset_dir / self.lang_folder / "auto_lang_ann.npy", allow_pickle=True).item()
+        if self.with_lang:
+            lang_data = np.load(self.dataset_dir / self.lang_folder / "auto_lang_ann.npy", allow_pickle=True).item()
+            lang_ep_start_end_ids = np.array(lang_data["info"]["indx"])  # each of them are 64
+            lang_ann = lang_data["language"]["emb"]
+        else:
+            lang_ep_start_end_ids = None
+            lang_ann = None
         ep_start_end_ids = np.load(self.dataset_dir / "ep_start_end_ids.npy")
-        lang_ep_start_end_ids = np.array(lang_data["info"]["indx"])  # each of them are 64
-        lang_ann = lang_data["language"]["emb"]
         shmem, shapes, sizes, dtypes, shmem_lookup = self._init_shmem(ep_start_end_ids)
 
         if shmem_lookup is not None:
             # using existing shared memory
             log.info("Using existing shared memory without reloading it.")
             return shmem_lookup
-
-        lang_lookup = []
-
-        episode_lookup_lang = defaultdict(list)
         log.info(
-            f"Loading {self.dataset_type} language episodes into shared memory. "
-            f"(progress bar shows only worker process 0)."
+            f"Loading {self.dataset_type} episodes into shared memory. " f"(progress bar shows only worker process 0)."
         )
 
-        if self.n_proc > len(ep_start_end_ids):
-            self.n_proc = len(ep_start_end_ids)
+        self.n_proc = min(len(ep_start_end_ids), self.n_proc)
         split_indices = np.array_split(ep_start_end_ids, self.n_proc, axis=0)
         split_lens = [np.sum(np.diff(split_indices[i])) for i in range(len(split_indices))]
         obs_size = {key: dtypes[key].itemsize * np.prod(shapes[key]) for key in dtypes}
@@ -186,13 +186,16 @@ class SharedMemoryLoader:
         episode_lookup_vision, lang_episode_dict = gather_results(return_dict)
 
         # lang data
-        for i, (start_idx, end_idx) in enumerate(tqdm(lang_ep_start_end_ids)):
-            for key in lang_episode_dict:
-                offset, step = lang_episode_dict[key][start_idx]
-                for j, idx in enumerate(range(start_idx, end_idx + 1 - self.min_window_size_lang)):
-                    episode_lookup_lang[key].append((offset, step + j))
-            for idx in range(start_idx, end_idx + 1 - self.min_window_size_lang):
-                lang_lookup.append(i)
+        lang_lookup = []
+        episode_lookup_lang = defaultdict(list)
+        if self.with_lang:
+            for i, (start_idx, end_idx) in enumerate(tqdm(lang_ep_start_end_ids)):
+                for key in lang_episode_dict:
+                    offset, step = lang_episode_dict[key][start_idx]
+                    for j, idx in enumerate(range(start_idx, end_idx + 1 - self.min_window_size_lang)):
+                        episode_lookup_lang[key].append((offset, step + j))
+                for idx in range(start_idx, end_idx + 1 - self.min_window_size_lang):
+                    lang_lookup.append(i)
         result = {
             "episode_lookup_vision": episode_lookup_vision,
             "episode_lookup_lang": episode_lookup_lang,
@@ -275,7 +278,8 @@ class SharedMemoryLoader:
             Episode dict.
         """
         keys = list(chain(*self.obs_space.values()))
-        keys.remove("language")
+        if "language" in keys:
+            keys.remove("language")
         keys.append("scene_obs")
         n_items = end_idx - start_idx
         episode = {}
