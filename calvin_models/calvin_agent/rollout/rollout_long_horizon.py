@@ -140,8 +140,12 @@ class RolloutLongHorizon(Callback):
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule, *args) -> None:  # type: ignore
         if pl_module.current_epoch == 0 and self.skip_epochs > 0:
             for i in range(1, 6):
-                pl_module.log(f"eval_lh/sr_chain_{i}", torch.tensor(0.0), on_step=False, sync_dist=True)
-            pl_module.log("eval_lh/avg_seq_len", torch.tensor(0.0), on_step=False, sync_dist=True)
+                pl_module.log(
+                    f"eval_lh/sr_chain_{i}", torch.tensor(0.0, device=pl_module.device), on_step=False, sync_dist=True
+                )
+            pl_module.log(
+                "eval_lh/avg_seq_len", torch.tensor(0.0, device=pl_module.device), on_step=False, sync_dist=True
+            )
         elif pl_module.current_epoch >= self.skip_epochs and pl_module.current_epoch % self.rollout_freq == 0:
             results = self.evaluate_policy(pl_module)
 
@@ -155,10 +159,14 @@ class RolloutLongHorizon(Callback):
             for i in range(1, 6):
                 n_success = sum(count[j] for j in reversed(range(i, 6)))
                 sr = n_success / len(results)
-                pl_module.log(f"eval_lh/sr_chain_{i}", torch.tensor(sr), on_step=False, sync_dist=True)
+                pl_module.log(
+                    f"eval_lh/sr_chain_{i}", torch.tensor(sr, device=pl_module.device), on_step=False, sync_dist=True
+                )
                 log_rank_0(f"{i} / 5 subtasks: {n_success} / {len(results)} sequences, SR: {sr * 100:.1f}%")
             avg_seq_len = np.mean(results)
-            pl_module.log("eval_lh/avg_seq_len", torch.tensor(avg_seq_len), on_step=False, sync_dist=True)
+            pl_module.log(
+                "eval_lh/avg_seq_len", torch.tensor(avg_seq_len, device=pl_module.device), on_step=False, sync_dist=True
+            )
             log_rank_0(f"Average successful sequence length: {avg_seq_len:.1f}")
             print()
 

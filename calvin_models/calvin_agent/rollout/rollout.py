@@ -160,7 +160,7 @@ class Rollout(Callback):
         outputs = [self.outputs]
 
         if pl_module.current_epoch == 0:
-            pl_module.log("tasks/average_sr", torch.tensor(0.0), on_step=False, sync_dist=True)
+            pl_module.log("tasks/average_sr", torch.tensor(0.0, device=pl_module.device), on_step=False, sync_dist=True)
         elif pl_module.current_epoch >= self.skip_epochs and (pl_module.current_epoch + 1) % self.rollout_freq == 0:
             # after first validation epoch, create task lookup dictionaries
             if self.task_to_id_dict is None:
@@ -181,7 +181,7 @@ class Rollout(Callback):
                         torch.sum(rollout_task_counter) / torch.sum(self.groundtruth_task_counter)
                         if torch.sum(self.groundtruth_task_counter) > 0
                         else torch.tensor(0.0)
-                    )
+                    ).to(pl_module.device)
                     pl_module.log(
                         f"tasks/average_sr_{mod}",
                         score,
@@ -197,7 +197,9 @@ class Rollout(Callback):
                             # log to tensorboard
                             pl_module.log(
                                 f"tasks/{self.tasks.id_to_task[i]}_{mod}",
-                                rollout_task_counter[i] / self.groundtruth_task_counter[i],
+                                torch.tensor(
+                                    rollout_task_counter[i] / self.groundtruth_task_counter[i], device=pl_module.device
+                                ),
                                 on_step=False,
                                 sync_dist=True,
                             )
