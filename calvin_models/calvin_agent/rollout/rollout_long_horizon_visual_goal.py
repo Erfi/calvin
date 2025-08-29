@@ -227,7 +227,7 @@ class RolloutLongHorizonVisualGoal(Callback):
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule, *args: Any) -> None:
         if pl_module.current_epoch == 0 and self.skip_epochs > 0:
-            for i in range(1, 6):
+            for i in range(1, self.num_tasks_per_rollout + 1):
                 pl_module.log(
                     f"eval_lh/sr_chain_{i}", torch.tensor(0.0, device=pl_module.device), on_step=False, sync_dist=True
                 )
@@ -243,16 +243,21 @@ class RolloutLongHorizonVisualGoal(Callback):
             results = gather_results(results)
             count = Counter(results)  # type: ignore
             print()
-            for i in range(1, 6):
-                n_success = sum(count[j] for j in reversed(range(i, 6)))
+            for i in range(1, self.num_tasks_per_rollout + 1):
+                n_success = sum(count[j] for j in reversed(range(i, self.num_tasks_per_rollout + 1)))
                 sr = n_success / len(results)
                 pl_module.log(
                     f"eval_lh/sr_chain_{i}", torch.tensor(sr, device=pl_module.device), on_step=False, sync_dist=True
                 )
-                log_rank_0(f"{i} / 5 subtasks: {n_success} / {len(results)} sequences, SR: {sr * 100:.1f}%")
+                log_rank_0(
+                    f"{i} / {self.num_tasks_per_rollout} subtasks: {n_success} / {len(results)} sequences, SR: {sr * 100:.1f}%"
+                )
             avg_seq_len = np.mean(results)
             pl_module.log(
-                "eval_lh/avg_seq_len", torch.tensor(avg_seq_len, device=pl_module.device), on_step=False, sync_dist=True
+                "eval_lh/avg_seq_len",
+                torch.tensor(avg_seq_len, device=pl_module.device, dtype=torch.float),
+                on_step=False,
+                sync_dist=True,
             )
             log_rank_0(f"Average successful sequence length: {avg_seq_len:.1f}")
             print()
@@ -287,7 +292,9 @@ class RolloutLongHorizonVisualGoal(Callback):
         if self.debug:
             os.makedirs("debug", exist_ok=True)
             initial_obs = self.env.get_obs()
-            fig, ax = plt.subplots(nrows=1, ncols=6, figsize=(15, 5))
+            fig, ax = plt.subplots(
+                nrows=1, ncols=self.num_tasks_per_rollout + 1, figsize=(3 * self.num_tasks_per_rollout, 5)
+            )
             img = initial_obs["rgb_obs"]["rgb_static"].detach().cpu().numpy().squeeze().transpose(1, 2, 0)
             ax[0].imshow(img)
             ax[0].set_title("initial state")
