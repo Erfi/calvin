@@ -151,7 +151,7 @@ class RolloutLongHorizonVisualGoal(Callback):
             tasks = json.load(f)
         return tasks
 
-    def get_sequences_from_dataset(self, start_end_tasks, num_sequences):
+    def get_offline_sequences(self, start_end_tasks, num_sequences):
         """
         creates a dictionary of
         {
@@ -221,7 +221,7 @@ class RolloutLongHorizonVisualGoal(Callback):
         if self.start_end_tasks is None:
             self.start_end_tasks = self.load_start_end_tasks(self.start_end_tasks_file)
 
-        self.eval_sequences = self.get_sequences_from_dataset(
+        self.eval_sequences = self.get_offline_sequences(
             start_end_tasks=self.start_end_tasks, num_sequences=self.num_sequences
         )
 
