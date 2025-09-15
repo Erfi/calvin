@@ -6,7 +6,7 @@ Methods presented here resemble those in rollout/rollout_long_horizon_visual_goa
 """
 
 from typing import Dict
-from collections import Counter
+from collections import Counter, defaultdict
 import logging
 from pathlib import Path
 import sys
@@ -22,7 +22,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-EP_LEN = 360
+EP_LEN_SEQ = 360
+EP_LEN_SINGLE = 120
 
 
 def load_start_end_tasks(start_end_tasks_file):
@@ -109,7 +110,7 @@ def get_offline_sequences(start_end_tasks, num_sequences, num_tasks_per_rollout)
         return sequences
 
 
-def evaluate_policy(
+def evaluate_policy_sequential(
     model,
     env,
     task_checker,
@@ -163,6 +164,82 @@ def evaluate_policy(
     return results
 
 
+def evaluate_policy_single(
+    model,
+    env,
+    task_checker,
+    start_end_tasks_file,
+    val_dataset_dir,
+    num_rollouts_per_task,
+    eval_log_dir=None,
+):
+    """
+    Run this function to evaluate a model on the CALVIN challenge using visual goals.
+
+    Args:
+        model: Must implement methods of CalvinBaseModel.
+        env: (Wrapped) calvin env.
+        task_checker: CalvinTaskChecker object.
+        start_end_tasks_file: Path to the start_end_tasks.json file.
+        val_dataset_dir: Path to the validation dataset directory containing frames refered to in eval_sequences.
+        num_rollouts_per_task: Number of rollouts to perform for each single task (How many of the same task to perform).
+        eval_log_dir: Path where to log evaluation results. If None, logs to /tmp/evaluation/
+
+    Returns:
+        Dictionary with results
+    """
+    # prepare evaluation sequences from offline dataset (validation)
+    start_end_tasks = load_start_end_tasks(start_end_tasks_file)
+    eval_sequences = get_offline_sequences(
+        start_end_tasks=start_end_tasks,
+        num_sequences=np.inf,  # get all sequences
+        num_tasks_per_rollout=1,  # only single tasks (no sequences)
+    )
+    task_dict = defaultdict(list)  # task_name -> list of (initial_state_idx, end_state_idx)
+    for initial_state_idx, eval_sequence in eval_sequences.items():
+        task_name = eval_sequence[0][0]
+        end_state_idx = eval_sequence[0][1]
+        if len(task_dict[task_name]) < num_rollouts_per_task:
+            task_dict[task_name].append((initial_state_idx, end_state_idx))
+
+    eval_log_dir = get_log_dir(eval_log_dir)
+    step_to_file = get_step_to_file(val_dataset_dir)
+
+    task_results = defaultdict(list)  # task_name -> list of success (1 or 0)
+    for task_name, task_idx_list in task_dict.items():
+        logger.info(f"Evaluating task {task_name} with {len(task_idx_list)} different initial states")
+        for initial_state_idx, goal_state_idx in tqdm(task_idx_list, position=0, leave=False):
+            success = evaluate_task(
+                model, env, task_checker, task_name, initial_state_idx, goal_state_idx, step_to_file
+            )
+            task_results[task_name].append(success)
+
+    # print the results for each task: Task_name: success_rate (n_success / n_rollouts)
+    for task_name, results in task_results.items():
+        n_success = sum(results)
+        sr = n_success / len(results)
+        logger.info(f"Task {task_name}: {n_success} / {len(results)} rollouts, SR: {sr * 100:.1f}%")
+    # overall success rate
+    all_results = [r for results in task_results.values() for r in results]
+    n_success = sum(all_results)
+    sr = n_success / len(all_results)
+    logger.info(f"Overall: {n_success} / {len(all_results)} rollouts, SR: {sr * 100:.1f}%")
+
+
+def evaluate_task(model, env, task_checker, task_name, initial_state_idx, goal_state_idx, step_to_file):
+    """
+    Evaluates the model on a single task with visual goal
+    """
+    # get goal-observation for the task
+    state = get_state_info_from_step(step_to_file=step_to_file, step=goal_state_idx)
+    goal_obs, _ = env.reset(robot_obs=state["robot_obs"], scene_obs=state["scene_obs"])
+    # reset the environment to the initial state of the task sequence
+    initial_state = get_state_info_from_step(step_to_file=step_to_file, step=initial_state_idx)
+    env.reset(robot_obs=initial_state["robot_obs"], scene_obs=initial_state["scene_obs"])
+    success = rollout(model, env, task_checker, (task_name, goal_obs), max_rollout_steps=EP_LEN_SINGLE)
+    return success
+
+
 def evaluate_sequence(model, env, task_checker, initial_state_idx, eval_sequence, step_to_file):
     """
     Evaluates the model on a single sequence with visual goals
@@ -179,7 +256,7 @@ def evaluate_sequence(model, env, task_checker, initial_state_idx, eval_sequence
     logger.info(f"Evaluating sequence: {' -> '.join([task[0] for task in subtasks])}")
     success_counter = 0
     for subtask in subtasks:
-        success = rollout(model, env, task_checker, subtask)
+        success = rollout(model, env, task_checker, subtask, max_rollout_steps=EP_LEN_SEQ)
         if success:
             success_counter += 1
         else:
@@ -187,7 +264,7 @@ def evaluate_sequence(model, env, task_checker, initial_state_idx, eval_sequence
     return success_counter
 
 
-def rollout(model, env, task_checker, subtask):
+def rollout(model, env, task_checker, subtask, max_rollout_steps):
     """
     Performs a rollout for the given subtask of a sequence.
     subtask: ("<task_name>", <goal_obs>)
@@ -198,7 +275,7 @@ def rollout(model, env, task_checker, subtask):
     model.reset()
     start_info = env.get_info()
     success = False
-    for _ in range(EP_LEN):
+    for _ in range(max_rollout_steps):
         action = model.step(obs, goal)
         obs, _, _, _, current_info = env.step(action)
         # check if current step solves a task
