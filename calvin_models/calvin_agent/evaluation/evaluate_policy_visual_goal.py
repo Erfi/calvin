@@ -59,14 +59,15 @@ def get_state_info_from_step(step_to_file: Dict, step: int):
     }
 
 
-def get_offline_sequences(start_end_tasks, num_sequences, num_tasks_per_rollout) -> Dict:
+def get_offline_sequences(start_end_tasks, num_sequences, num_tasks_per_rollout, sort_strategy) -> Dict:
     """
     Looking for sequences that are completed one after the other.
 
     Args:
         start_end_tasks: A dictionary mapping initial frame indices to a list of completed tasks and their frame indices.
-        num_sequences: The number of sequences to return.
+        num_sequences: The number of sequences to return. -1 means return all sequences.
         num_tasks_per_rollout: The number of tasks to complete in each rollout sequence.
+        sort_strategy: Strategy to select sequences one of ["shortest", "longest", "random"]
 
     Returns:
         A dictionary mapping initial frame indices to a list of completed (tasks names and their frame indices) e.g.:
@@ -98,16 +99,29 @@ def get_offline_sequences(start_end_tasks, num_sequences, num_tasks_per_rollout)
     assert (
         len(sequences) > 0
     ), f"No valid sequences found in the start_end_tasks.json with num_tasks_per_rollout={num_tasks_per_rollout}"
-    if len(sequences) > num_sequences:
+    if len(sequences) < num_sequences:
+        logger.info(
+            f"Requested {num_sequences} but only {len(sequences)} valid sequences found for num_tasks_per_rollout={num_tasks_per_rollout}, returning all of them."
+        )
+        num_sequences = len(sequences)
+    if sort_strategy == "shortest":
+        sequences = dict(
+            sorted(sequences.items(), key=lambda item: item[1][-1][1] - item[0])
+        )  # sort by length of sequence
+        sequences = dict(list(sequences.items())[:num_sequences])  # take the first num_sequences sequences
+    elif sort_strategy == "longest":
+        sequences = dict(
+            sorted(sequences.items(), key=lambda item: item[1][-1][1] - item[0], reverse=True)
+        )  # sort by length of sequence
+        sequences = dict(list(sequences.items())[:num_sequences])  # take the first num_sequences sequences
+    elif sort_strategy == "random":
         with temp_seed(42):
             keys = np.random.choice(list(sequences.keys()), size=num_sequences, replace=False)
-            return {int(k): sequences[k] for k in keys}
+            sequences = {int(k): sequences[k] for k in keys}
     else:
-        # if we have less sequences than requested, return all of them
-        logger.info(
-            f"Only {len(sequences)} valid sequences found for num_tasks_per_rollout={num_tasks_per_rollout}, returning all of them."
-        )
-        return sequences
+        raise ValueError(f"Unknown sort_strategy {sort_strategy}, must be one of ['shortest', 'longest', 'random']")
+
+    return sequences
 
 
 def evaluate_policy_sequential(
@@ -119,17 +133,21 @@ def evaluate_policy_sequential(
     num_sequences,
     num_tasks_per_sequence,
     eval_log_dir=None,
+    sort_strategy="shortest",
 ):
     """
     Run this function to evaluate a model on the CALVIN challenge using visual goals.
 
     Args:
         model: Must implement methods of CalvinBaseModel.
-        env: (Wrapped) calvin env.
+        env: calvin env.
+        task_checker: CalvinTaskChecker object.
+        start_end_tasks_file: Path to the start_end_tasks.json file.
         val_dataset_dir: Path to the validation dataset directory containing frames refered to in eval_sequences.
+        num_sequences: Number of sequences to perform (How many different initial states to evaluate).
+        num_tasks_per_sequence: Number of tasks to perform in each sequence (Length of each sequence).
         eval_log_dir: Path where to log evaluation results. If None, logs to /tmp/evaluation/
-        debug: If True, show camera view and debug info.
-        create_plan_tsne: Collect data for TSNE plots of latent plans (does not work for your custom model)
+        sort_strategy: Strategy to select sequences one of ["shortest", "longest", "random"]
 
     Returns:
         Dictionary with results
@@ -140,6 +158,7 @@ def evaluate_policy_sequential(
         start_end_tasks=start_end_tasks,
         num_sequences=num_sequences,
         num_tasks_per_rollout=num_tasks_per_sequence,
+        sort_strategy=sort_strategy,
     )
 
     eval_log_dir = get_log_dir(eval_log_dir)
@@ -172,6 +191,7 @@ def evaluate_policy_single(
     val_dataset_dir,
     num_rollouts_per_task,
     eval_log_dir=None,
+    sort_strategy="shortest",
 ):
     """
     Run this function to evaluate a model on the CALVIN challenge using visual goals.
@@ -184,6 +204,7 @@ def evaluate_policy_single(
         val_dataset_dir: Path to the validation dataset directory containing frames refered to in eval_sequences.
         num_rollouts_per_task: Number of rollouts to perform for each single task (How many of the same task to perform).
         eval_log_dir: Path where to log evaluation results. If None, logs to /tmp/evaluation/
+        sort_strategy: Strategy to select sequences one of ["shortest", "longest", "random"]
 
     Returns:
         Dictionary with results
@@ -194,7 +215,9 @@ def evaluate_policy_single(
         start_end_tasks=start_end_tasks,
         num_sequences=np.inf,  # get all sequences
         num_tasks_per_rollout=1,  # only single tasks (no sequences)
+        sort_strategy=sort_strategy,
     )
+
     task_dict = defaultdict(list)  # task_name -> list of (initial_state_idx, end_state_idx)
     for initial_state_idx, eval_sequence in eval_sequences.items():
         task_name = eval_sequence[0][0]
